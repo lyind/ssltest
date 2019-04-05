@@ -20,6 +20,9 @@
 package net.christopherschultz.ssltest;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -470,6 +473,7 @@ catch (SSLPeerUnverifiedException e)
 }
     } });
 //    */
+
                     socket.startHandshake();
 
                     /*
@@ -637,7 +641,27 @@ catch (SSLPeerUnverifiedException e)
 
             try
             {
+                Method method = socket.getClass().getDeclaredMethod("shutdownInput", boolean.class);
+                method.setAccessible(true);
+
+                // start handshake
                 socket.startHandshake();
+
+                // immediately call socket.shutdownInput(false);
+                Object r = method.invoke(socket, false);
+                socket.shutdownOutput();
+
+                while(socket != null)
+                {
+                    try
+                    {
+                        Thread.sleep(5000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        break;
+                    }
+                }
 
                 System.out.print("Given this client's capabilities ("
                         + supportedProtocols
@@ -685,6 +709,17 @@ catch (SSLPeerUnverifiedException e)
             }
             catch (SocketException se)
             {
+                while(socket != null)
+                {
+                    try
+                    {
+                        Thread.sleep(5000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        break;
+                    }
+                }
                 System.out.println("Error during connection handshake for protocols "
                                    + supportedProtocols
                                    + ": server likely does not support any of these protocols.");
@@ -805,7 +840,7 @@ outDone = true;
         sock.connect(address, connectTimeout);
 
         // Wrap plain socket in an SSL socket
-        return (SSLSocket)sf.createSocket(sock, host, port, true);
+        return (SSLSocket)sf.createSocket(sock, host, port, false);
     }
 
     private static String[] getJVMSupportedCipherSuites(String protocol, SecureRandom rand)
