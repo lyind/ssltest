@@ -632,113 +632,67 @@ catch (SSLPeerUnverifiedException e)
                                                            rand,
                                                            trustManagers,
                                                            keyManagers);
-
+        Method shutdownInput = null;
         SSLSocket socket = null;
-
-        try
+        for (int i = 0; i < 10000; ++i)
         {
-            socket = createSSLSocket(address, host, port, connectTimeout, readTimeout, sf);
-
             try
             {
-                Method method = socket.getClass().getDeclaredMethod("shutdownInput", boolean.class);
-                method.setAccessible(true);
+                socket = createSSLSocket(address, host, port, connectTimeout, readTimeout, sf);
 
-                // start handshake
-                socket.startHandshake();
-
-                // immediately call socket.shutdownInput(false);
-                Object r = method.invoke(socket, false);
-                socket.shutdownOutput();
-
-                while(socket != null)
+                if (shutdownInput == null)
                 {
-                    try
-                    {
-                        Thread.sleep(5000);
-                    }
-                    catch (InterruptedException e)
-                    {
-                        break;
-                    }
+                    final Class<?> socketClass = socket.getClass();
+                    shutdownInput = socketClass.getDeclaredMethod("shutdownInput", boolean.class);
+                    shutdownInput.setAccessible(true);
                 }
 
-                System.out.print("Given this client's capabilities ("
-                        + supportedProtocols
-                        + "), the server prefers protocol=");
-                System.out.print(socket.getSession().getProtocol());
-                System.out.print(", cipher=");
-                System.out.println(socket.getSession().getCipherSuite());
-
-                if(showCerts)
+                try
                 {
-                    System.out.println("Attempting to check certificates:");
-                    Certificate[] certs = socket.getSession().getPeerCertificates();
-                    for(Certificate cert : certs)
-                    {
-                        String certType = cert.getType();
-                        System.out.println("Certificate: " + certType);
-                        if("X.509".equals(certType))
-                        {
-                            X509Certificate x509 = (X509Certificate)cert;
-                            System.out.println("Subject: " + x509.getSubjectDN());
-                            System.out.println("Issuer: " + x509.getIssuerDN());
-                            System.out.println("Serial: " + x509.getSerialNumber());
-                            try {
-                                x509.checkValidity();
-                                System.out.println("Certificate is currently valid.");
-                            } catch (CertificateException ce) {
-                                System.out.println("WARNING: certificate is not valid: " + ce.getMessage());
-                            }
-                            //                   System.out.println("Signature: " + toHexString(x509.getSignature()));
-                            //                   System.out.println("cert bytes: " + toHexString(cert.getEncoded()));
-                            //                   System.out.println("cert bytes: " + cert.getPublicKey());
-                        }
-                        else
-                        {
-                            System.out.println("Unknown certificate type (" + cert.getType() + "): " + cert);
-                        }
-                    }
+                    // start handshake
+                    socket.startHandshake();
 
-                    if(certs instanceof X509Certificate[]
-                       && checkTrust((X509Certificate[])certs, trustManagers))
-                        System.out.println("Certificate chain is trusted");
-                    else
-                        System.out.println("Certificate chain is UNTRUSTED");
+                    // immediately call socket.shutdownInput(false);
+                    //Object r = shutdownInput.invoke(socket, false);
+
+                    // skip all normal communication with the server
+                    socket.shutdownOutput();
+                }
+                catch (SocketException se)
+                {
+                    System.out.println("Error during connection handshake for protocols "
+                            + supportedProtocols
+                            + ": server likely does not support any of these protocols.");
+
+                    if (showCerts)
+                        System.out.println("Unable to show server certificate without a successful handshake.");
+                }
+                catch (SSLHandshakeException she)
+                {
+                    Throwable cause = she.getCause();
+                    if (cause instanceof CertificateException)
+                        System.out.println("Server certificate is not trusted, cannot complete handshake. Try -no-check-certificate");
+
+                    if (showCerts)
+                        System.out.println("Unable to show server certificate without a successful handshake.");
                 }
             }
-            catch (SocketException se)
+            catch (Exception e)
             {
-                while(socket != null)
-                {
-                    try
-                    {
-                        Thread.sleep(5000);
-                    }
-                    catch (InterruptedException e)
-                    {
-                        break;
-                    }
-                }
-                System.out.println("Error during connection handshake for protocols "
-                                   + supportedProtocols
-                                   + ": server likely does not support any of these protocols.");
-
-                if(showCerts)
-                    System.out.println("Unable to show server certificate without a successful handshake.");
-            } catch (SSLHandshakeException she) {
-                Throwable cause = she.getCause();
-                if(cause instanceof CertificateException)
-                    System.out.println("Server certificate is not trusted, cannot complete handshake. Try -no-check-certificate");
-
-                if(showCerts)
-                    System.out.println("Unable to show server certificate without a successful handshake.");
+                System.err.println("error: " + e.getMessage());
+            }
+            finally
+            {
+                // we deliberately leak the sockets
+                // if (null != socket) try { socket.close(); }
+                //catch (IOException ioe) { ioe.printStackTrace(); }
             }
         }
-        finally
+
+        System.err.println("Done, waiting for user to cancel process (and release sockets/memory).");
+        while(true)
         {
-            if (null != socket) try { socket.close(); }
-            catch (IOException ioe) { ioe.printStackTrace(); }
+            Thread.sleep(5000);
         }
 
 /*
