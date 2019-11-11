@@ -4,7 +4,7 @@ There are two .java source files which contain everything. You can use Apache `a
 
 
 ```
-$ java -jar ssltest.jar -connectonly TARGET_UNDERTOW_SERVER_NAME_OR_IP [TARGET_PORT]
+$ java -jar ssltest.jar -connectonly TARGET_UNDERTOW_SERVER_NAME_OR_IP:TARGET_PORT
 ```
 
 The hostname of the target server is required, and the default port is 443 (HTTPS).
