@@ -4,7 +4,7 @@ BASE=`dirname "$0"`
 
 mkdir -p "${BASE}/build/classes"
 
-javac -Xlint:-options -source 1.5 -target 1.5 -d "${BASE}/build/classes" $( find "${BASE}"/src/java -name "*.java" )
+javac -Xlint:-options -source 1.8 -target 1.8 -d "${BASE}/build/classes" $( find "${BASE}"/src/java -name "*.java" )
 
 echo "Main-Class: net.christopherschultz.ssltest.SSLTest" > "${BASE}"/build/MANIFEST.MF
 
